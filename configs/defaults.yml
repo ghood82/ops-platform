@@ -1,0 +1,61 @@
+# Shared defaults for all projects.
+# Project-specific configs override these values via deep merge.
+# Use ${ENV_VAR} syntax for secrets — never hardcode sensitive values.
+
+project:
+  name: "default"
+  repo: "user/repo"
+  deploy_target: "vercel"
+  prod_url: "https://example.com"
+
+monitoring:
+  log_source: "cloudwatch"
+  cloudwatch_log_group: ""
+  cloudwatch_region: "us-east-1"
+  vercel_team_id: ""
+  vercel_project_id: ""
+
+ci:
+  has_staging: false
+  test_command: "pytest"
+  e2e_command: ""
+  lint_command: "npm run lint"
+  build_command: "npm run build"
+  coverage_minimum: 50
+
+review:
+  hipaa_checks: false
+  org_id_scoping: false
+  custom_rules: []
+
+circuit_breaker:
+  monitoring_window: 300
+  poll_interval: 60
+  mode: "enforce"
+  thresholds:
+    error_rate_increase: 50
+    p95_latency_increase: 100
+    critical_endpoints:
+      - "/health"
+    min_success_rate: 95
+  rollback_method: "vercel"
+
+notifications:
+  telegram_chat_id: "${TELEGRAM_CHAT_ID}"
+  jira_project_key: ""
+
+triage:
+  schedule: "0 */4 * * *"
+  severity_dimensions:
+    - frequency
+    - recency
+    - user_impact
+    - blast_radius
+    - recurrence
+
+models:
+  code_quality: "claude-sonnet-4-6-20250514"
+  security: "claude-opus-4-6-20250514"
+  dependencies: "claude-haiku-4-5-20251001"
+  health_analysis: "claude-sonnet-4-6-20250514"
+  release_notes: "claude-haiku-4-5-20251001"

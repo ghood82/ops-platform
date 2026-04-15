@@ -1,0 +1,52 @@
+# RDC Platform — Healthcare cybersecurity for rural hospitals
+# Overrides defaults.yml. Secrets come from GitHub Actions secrets.
+
+project:
+  name: "RDC Platform"
+  repo: "ghood82/rdc-scaled"
+  deploy_target: "lightsail"
+  prod_url: "https://app.scaledservicesgroup.com"
+
+monitoring:
+  log_source: "cloudwatch"
+  cloudwatch_log_group: "/rdc/backend"
+  cloudwatch_region: "us-west-2"
+
+ci:
+  has_staging: true
+  test_command: "pytest"
+  e2e_command: "npx playwright test"
+  lint_command: "npm run lint"
+  build_command: "npm run build"
+  coverage_minimum: 50
+
+review:
+  hipaa_checks: true
+  org_id_scoping: true
+  custom_rules:
+    - "Never log PHI/PII — use record IDs only"
+    - "AI calls must run in background (never block HTTP handlers)"
+    - "All DB queries must scope to organization_id"
+    - "No console.log in committed code"
+
+circuit_breaker:
+  monitoring_window: 300
+  poll_interval: 60
+  mode: "enforce"
+  thresholds:
+    error_rate_increase: 50
+    p95_latency_increase: 100
+    critical_endpoints:
+      - "/api/v1/health"
+      - "/api/v1/auth/me"
+    min_success_rate: 95
+  rollback_method: "ssh"
+  # ssh_host and ssh_key come from GitHub secrets:
+  #   LIGHTSAIL_SSH_HOST, LIGHTSAIL_SSH_KEY (base64-encoded PEM)
+
+notifications:
+  telegram_chat_id: "${TELEGRAM_CHAT_ID}"
+  jira_project_key: "RDC"
+
+triage:
+  schedule: "0 */4 * * *"
