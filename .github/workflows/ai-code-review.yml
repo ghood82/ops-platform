@@ -1,0 +1,146 @@
+name: AI Code Review
+
+on:
+  workflow_call:
+    inputs:
+      review_depth:
+        description: 'Review depth: full (3 passes) or light (1 pass)'
+        required: false
+        default: 'full'
+        type: string
+      custom_rules:
+        description: 'Newline-separated custom review rules for this project'
+        required: false
+        default: ''
+        type: string
+      model_quality:
+        description: 'Model ID for code quality pass'
+        required: false
+        default: 'claude-sonnet-4-6-20250514'
+        type: string
+      model_security:
+        description: 'Model ID for security pass'
+        required: false
+        default: 'claude-opus-4-6-20250514'
+        type: string
+      model_deps:
+        description: 'Model ID for dependencies pass'
+        required: false
+        default: 'claude-haiku-4-5-20251001'
+        type: string
+    secrets:
+      ANTHROPIC_API_KEY:
+        required: true
+
+jobs:
+  review-full:
+    if: inputs.review_depth == 'full'
+    strategy:
+      matrix:
+        include:
+          - pass_name: code-quality
+            prompt: review/prompts/code-quality.md
+            model: claude-sonnet-4-6-20250514
+          - pass_name: security
+            prompt: review/prompts/security.md
+            model: claude-opus-4-6-20250514
+          - pass_name: dependencies
+            prompt: review/prompts/dependencies.md
+            model: claude-haiku-4-5-20251001
+      fail-fast: false
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Checkout ops-platform
+        uses: actions/checkout@v4
+        with:
+          repository: ghood82/ops-platform
+          ref: v1
+
+      - name: Get PR diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh pr diff "$PR_NUMBER" --repo "$REPO" > /tmp/pr.diff || true
+          echo "Diff size: $(wc -c < /tmp/pr.diff) bytes"
+
+      - name: Run review pass
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PASS_NAME: ${{ matrix.pass_name }}
+          MODEL: ${{ matrix.model }}
+          PROMPT: ${{ matrix.prompt }}
+          CUSTOM_RULES: ${{ inputs.custom_rules }}
+        run: |
+          bash review/scripts/run-review-pass.sh \
+            "$PASS_NAME" \
+            "$MODEL" \
+            "$PROMPT" \
+            /tmp/pr.diff \
+            "$CUSTOM_RULES" \
+            > /tmp/review-comment.md
+
+      - name: Post review comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          bash review/scripts/post-review-comment.sh \
+            "$REPO" \
+            "$PR_NUMBER" \
+            "$(cat /tmp/review-comment.md)"
+
+  review-light:
+    if: inputs.review_depth == 'light'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Checkout ops-platform
+        uses: actions/checkout@v4
+        with:
+          repository: ghood82/ops-platform
+          ref: v1
+
+      - name: Get PR diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh pr diff "$PR_NUMBER" --repo "$REPO" > /tmp/pr.diff || true
+
+      - name: Run combined light review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MODEL_QUALITY: ${{ inputs.model_quality }}
+          CUSTOM_RULES: ${{ inputs.custom_rules }}
+        run: |
+          cat review/prompts/code-quality.md > /tmp/combined-prompt.md
+          echo -e "\n---\n" >> /tmp/combined-prompt.md
+          cat review/prompts/security.md >> /tmp/combined-prompt.md
+
+          bash review/scripts/run-review-pass.sh \
+            "combined" \
+            "$MODEL_QUALITY" \
+            /tmp/combined-prompt.md \
+            /tmp/pr.diff \
+            "$CUSTOM_RULES" \
+            > /tmp/review-comment.md
+
+      - name: Post review comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          bash review/scripts/post-review-comment.sh \
+            "$REPO" \
+            "$PR_NUMBER" \
+            "$(cat /tmp/review-comment.md)"
