@@ -16,3 +16,6 @@ Shared AI infrastructure for all projects. Provides:
 4. Run `scripts/setup-project.sh <your-project>` to verify
 
 See `docs/superpowers/specs/2026-04-15-ops-platform-design.md` for the full design spec.
+
+## Contributing
+See CLAUDE.md for project conventions.
