@@ -1,0 +1,12 @@
+name: Self Test — AI Review
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  ai-review:
+    uses: ./.github/workflows/ai-code-review.yml
+    with:
+      review_depth: 'light'
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
