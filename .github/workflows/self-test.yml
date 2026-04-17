@@ -5,7 +5,7 @@ on:
 
 jobs:
   ai-review:
-    uses: ./.github/workflows/ai-code-review.yml
+    uses: ghood82/ops-platform/.github/workflows/ai-code-review.yml@v1
     with:
       review_depth: 'light'
     secrets:
